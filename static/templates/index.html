@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <title>♂Ahhhhhhhhhhhhh♂</title>
+</head>
+
+<body>
+<p class="lead">
+  这是一个标签筛选器，区别在于加入了自定义的私货标签。
+</p>
+    <form>
+        <div class="form-group row">
+
+        </div>
+    </form>
+    <div>
+        <table class="table table-striped table-bordered table-hover" id="table">
+            <thead class="thead-dark">
+                <tr>
+                    <th>干员代号</th>
+                    <th>职业</th>
+                    <th>⭐</th>
+                    <th>阻挡数</th>
+                    <th>特性</th>
+                    <th>标签</th>
+                    <th>额外标签</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for wifi in wifis %}
+
+                <tr id="{{ wifi['_id'] }}">
+                    <td>{{wifi['_source'].get("name")}}</td>
+                    <td>{{wifi['_source'].get("profession")}}</td>
+                    <td>{{wifi['_source'].get("stars")}}</td>
+                    <td>{{wifi['_source'].get("block")}}</td>
+                    <td>{{wifi['_source'].get("comment")}}</td>
+                    <td>{{", ".join(wifi['_source'].get("raw_tags"))}}</td>
+                    <td>{{", ".join(wifi['_source'].get("tags"))}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <!--<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>-->
+        <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>-->
+        <!--<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>-->
+        <script>
+            var request = new XMLHttpRequest()
+            request.onreadystatechange = function () { // 状态发生变化时，函数被回调
+                if (request.readyState === 4) { // 成功完成
+                    // 判断响应结果:
+                    if (request.status === 200) {
+                        // 成功，通过responseText拿到响应的文本:
+                        var data = JSON.parse(request.responseText)
+
+                        return document.getElementById('table').value = request.responseText
+                    } else {
+                        // 失败，根据响应码判断失败原因:
+                        return
+                    }
+                } else {
+                    // HTTP请求还在继续...
+                }
+            }
+
+            // 发送请求:
+            request.open('GET', 'http://172.17.11.147:9200/wifi')
+            request.send()
+
+        </script>
+    </div>
+</body>
+
+</html>
