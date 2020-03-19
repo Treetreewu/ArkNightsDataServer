@@ -12,27 +12,45 @@ HOST = "172.17.11.147"
 PORT = 9200
 INDEX = "wifi"
 
-INDEX_MAPPING = {
+CHARACTER_MAPPING = {
     "mappings": {
+        "dynamic": "strict",  # 如果遇到新字段抛出异常
         "properties": {
+            "char": "char_285_medic2",
             "name": {"type": "keyword"},
-            "organization": {"type": "keyword"},
-            "profession": {"type": "keyword"},
-            "stars": {"type": "byte"},
-            "gender": {"type": "keyword"},
-            "infected": {"type": "boolean"},
-            # "obtain": {"type": "array"},
-            "life": {"type": "integer"},
-            "attack": {"type": "integer"},
-            "attack_resistance": {"type": "integer"},
-            "magic_resistance": {"type": "integer"},
-            "redeployment": {"type": "keyword"},
-            "cost": {"type": "byte"},
-            "perfect_cost": {"type": "byte"},
-            "block": {"type": "byte"},
-            "attack_speed": {"type": "keyword"},
-            "comment": {"type": "text"},
-            # "raw_tags": {"type": "array"},
+            "description": "恢复友方单位生命，且不受<@ba.kw>部署数量</>限制，但再部署时间极长",
+            "team": {"type": "byte"},
+            "displayNumber": {"type": "keyword"},
+            "appellation": {"type": "keyword"},
+            "position": {"type": "keyword"},
+            "tagList": {"type": "keyword"},
+            "itemUsage": "罗德岛医疗机器人Lancet-2，被工程师可露希尔派遣来执行战地医疗任务。",
+            "itemDesc": "她知道自己是一台机器人。",
+            "itemObtainApproach": "招募寻访",
+            "star": 1,
+            "profession": "MEDIC",
+            "attributesLv1": {
+                "type": "object",
+                "properties": {
+                    "maxHp": {"type": "integer"},
+                    "atk": {"type": "integer"},
+                    "def": {"type": "integer"},
+                    "magicResistance": 0.0,
+                    "cost": {"type": "byte"},
+                    "blockCnt": {"type": "byte"},
+                    "moveSpeed": 1.0,
+                    "attackSpeed": 100.0,
+                    "baseAttackTime": 2.85,
+                    "respawnTime": 200,
+                    "hpRecoveryPerSec": 0.0,
+                    "spRecoveryPerSec": 1.0,
+                    "maxDeployCount": 1,
+                    "maxDeckStackCnt": 0,
+                    "tauntLevel": 0,
+                    "massLevel": 0,
+                    "baseForceLevel": 0,
+                }
+            },
         }
     }
 }
@@ -59,12 +77,14 @@ def update_elastic(data, remap=False):
 
 def add_tags(tags: dict):
     for wifi in tags:
+        if '位移' in tags[wifi] and '控制' not in tags[wifi]:
+            tags[wifi].append('控制')
         try:
             es.update_by_query(INDEX, {"query": {"match_phrase": {"name": wifi}},
                                        "script": {
                                            "inline": f"ctx._source.tags={tags[wifi]}",
                                            "lang": "painless",
-                                           "max_compilations_rate": ["500/5m"]
+                                           "max_compilations_rate": "500/5m"
                                        },
                                        "size": 1}, conflicts="proceed")
         except:
@@ -159,16 +179,7 @@ class Query:
 
 if __name__ == '__main__':
     update_elastic(get_update())
+    add_tags(wifi_tags)
     # query(["buff"])
     # print(get_all())
-    example = {
-        "AND": [
-            {"stars": [5, 6]},
-            {"gender": "女"},
-            {"AND": [
-                {"tags": "buff"},
-                {"profession": "辅助"},
-            ]}
-        ],
-    }
     # print(Query(example).query())

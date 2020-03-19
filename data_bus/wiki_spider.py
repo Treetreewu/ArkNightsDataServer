@@ -1,7 +1,7 @@
 import os
 
 import requests
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 import re
 
 from utils import download_file, ValueUtils
@@ -10,6 +10,7 @@ COLS = ['image', 'name', 'organization', 'profession', 'stars', 'gender', 'infec
         'attack_resistance', 'magic_resistance', 'redeployment', 'cost', 'perfect_cost', 'block', 'attack_speed',
         'comment', 'raw_tags']
 
+# ------------------------Deprecated--------------------------
 
 class DoMan:
     """
@@ -64,4 +65,4 @@ def get_update(html_cache=None):
 
 
 if __name__ == '__main__':
-    print(get_update("../test.html"))
+    print(get_update())
