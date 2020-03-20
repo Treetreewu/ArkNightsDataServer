@@ -16,19 +16,19 @@ CHARACTER_MAPPING = {
     "mappings": {
         "dynamic": "strict",  # 如果遇到新字段抛出异常
         "properties": {
-            "char": "char_285_medic2",
+            "characterKey": {"type": "keyword"},
             "name": {"type": "keyword"},
-            "description": "恢复友方单位生命，且不受<@ba.kw>部署数量</>限制，但再部署时间极长",
+            "description": {"type": "text"},
             "team": {"type": "byte"},
             "displayNumber": {"type": "keyword"},
             "appellation": {"type": "keyword"},
             "position": {"type": "keyword"},
             "tagList": {"type": "keyword"},
-            "itemUsage": "罗德岛医疗机器人Lancet-2，被工程师可露希尔派遣来执行战地医疗任务。",
-            "itemDesc": "她知道自己是一台机器人。",
-            "itemObtainApproach": "招募寻访",
-            "star": 1,
-            "profession": "MEDIC",
+            "itemUsage": {"type": "text"},
+            "itemDesc": {"type": "text"},
+            "itemObtainApproach": {"type": "keyword"},
+            "star": {"type": "byte"},
+            "profession": {"type": "keyword"},
             "attributesLv1": {
                 "type": "object",
                 "properties": {
@@ -44,11 +44,11 @@ CHARACTER_MAPPING = {
                     "respawnTime": 200,
                     "hpRecoveryPerSec": 0.0,
                     "spRecoveryPerSec": 1.0,
-                    "maxDeployCount": 1,
-                    "maxDeckStackCnt": 0,
-                    "tauntLevel": 0,
-                    "massLevel": 0,
-                    "baseForceLevel": 0,
+                    "maxDeployCount": {"type": "byte"},
+                    "maxDeckStackCnt": {"type": "byte"},
+                    "tauntLevel": {"type": "short"},
+                    "massLevel": {"type": "short"},
+                    "baseForceLevel": {"type": "short"},
                 }
             },
         }

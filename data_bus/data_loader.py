@@ -1,14 +1,13 @@
 import json
 import os
 import re
+import data_bus.settings
 
-DATA_PATH = "../ArknightsGameData/zh_CN/gamedata/"
+DATA_PATH = f"../ArknightsGameData/{data_bus.settings.DATA_LANGUAGE}/gamedata/"
 DATA_TO_LOAD = {
     "character": "excel/character_table.json",
     "team": "excel/handbook_team_table.json",
 }
-
-DB_KEYS = []
 
 
 class LoadedData:
