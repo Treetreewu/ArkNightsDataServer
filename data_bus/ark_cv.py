@@ -1,4 +1,7 @@
+import functools
 import os
+import re
+
 import numpy as np
 
 import cv2
@@ -10,11 +13,19 @@ pytesseract.pytesseract.tesseract_cmd = "C:\\Program Files\\Tesseract-OCR\\tesse
 class Config:
     DEBUG = True
 
+    OCR_PRE_THRESHOLD = 168
+    GRIDING_PRE_THRESHOLD = 220
+
     ROW_SLOPE_THRESHOLD = 140000
     COLUMN_SLOPE_THRESHOLD = 40000  # first line
     LINES_MERGE_BLUR = 2
     CONTINUAL_LINE_THRESHOLD = 20
     BOTTOM_ROW_SLOPE_THRESHOLD = 1024
+
+
+def image_to_string(image, language="chi_sim+eng", options="--psm 7", **kwargs):
+    raw_out = pytesseract.image_to_string(image, language, options, **kwargs)
+    return re.sub("/s", "", raw_out)
 
 
 class Box:
@@ -152,6 +163,11 @@ class BoxImage:
         if not self.box.in_cell_level_region:
             pass
 
+    def read_info(self):
+        result = []
+        for cell in self.cells:
+            yield cell.read_info()
+
 
 class Cell:
     """
@@ -184,10 +200,13 @@ class Cell:
         if not (self.box_image.box.in_cell_text_region and self.box_image.box.in_cell_level_region and
                 self.box_image.box.in_cell_elite_region):
             self.box_image.split_sections()
+
+        # read name.
         text_region = self.box_image.box.in_cell_text_region
         show(255 - self.img[text_region[0]:text_region[1]])
+        name = image_to_string(255 - self.img[text_region[0]:text_region[1]])
 
-        print(pytesseract.image_to_string(255 - self.img[text_region[0]:text_region[1]]))
+        # read level.
 
 
 def find_most_confident(data_list,
@@ -225,11 +244,17 @@ def find_most_confident(data_list,
     return final_results
 
 
+def find_edge(img, threshold, axis=0):
+    show(img)
+
+
+
 def debug(func):
     """
     Debug decorator.
     If not in debug mode, skip the decorated function.
     """
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if Config.DEBUG:
             return func(*args, **kwargs)
@@ -251,7 +276,8 @@ def show(img):
 @debug
 def mark(img, color=128):
     if type(img[0]) != np.ndarray:
-        img.fill(color)
+        pass
+        # img.fill(color)
     else:
         for i in img:
             mark(i, color)
