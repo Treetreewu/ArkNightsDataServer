@@ -24,5 +24,7 @@ class LoadedData:
 loaded_data = LoadedData()
 
 if __name__ == '__main__':
-    print(loaded_data.character.keys())
+    for c in loaded_data.character.values():
+        if c["profession"] != "TOKEN" and c["profession"] != "TRAP":
+            print(c["name"])
 
