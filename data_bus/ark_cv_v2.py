@@ -1,27 +1,31 @@
+# -*- coding: utf-8 -*-
 import collections
-import copy
 import functools
 import os
 import re
 import traceback
+import PIL
 import numpy
 import cv2
 import intervals
 import locale
 import pytesseract
 import ctypes
+import platform
 from pyocr.libtesseract import tesseract_raw
+from data_bus.data_loader import loaded_data
 
 IMG_COPY_FOR_SHOW = {}
+P = "-c tessedit_char_whitelist=安尔梅微使见琥角喉道月缠嘉克格艾烟松讯旺雅夫理远阿调苏神桑推麦米提罗砂蓝毒雉陈宾蜂吽巡锡初劳熊陀境拉塞特箱猎守者蓉槐黑莉比云鸮温兰苇马煌史雷香炎赛点崖人山豆风砾草切诗能卡星铁蝎坚雪西屠惊慑古默夜红萨空面斑铸天真冬罪送哲爆鲁断慕火法颂娜伊年蛇刻蒂洁莺清宴莫芙客恋暴熔叶药利暗赫银笛幽消陨巫柏刀霜灵玫莎都色海心末娘梓行凛缇华丝闪布拜兽洛金影光羽林之极王黛尼狮峰斯地普丸蛰维翎怀流泡杜德临索杰师葬娅俄喙进芬灰深因伦白食鲨桃傀可魔琳sRXEaen1CcTt3l2WLMFH".encode("gbk")
 
 
 class Config:
     DEBUG = True
-    C_TESS_MODE = True
-    TESSERACT_PATH = "C:\\Program Files\\Tesseract-OCR"
+    C_TESS_MODE = False
+    TESSERACT_PATH = "/usr/share/tesseract-ocr/4.00/" if platform.platform(terse=True).startswith("Linux") else "C:\\Program Files\\Tesseract-OCR"
     TESSERACT_DATA_PATH = os.path.join(TESSERACT_PATH, "tessdata")
     TESSERACT_LIB = [os.path.join(TESSERACT_PATH, "libtesseract-5.dll"), "libtesseract.so"]
-    TEXT_OCR_CONFIGS = ["load_system_dawg 0", "load_freq_dawg 0", "user_words_suffix user-words", "user_patterns_suffix user-patterns"]
+    TEXT_OCR_CONFIGS = ["arknights"]
     HSV_V_THRESHOLD = 150
     HSV_V_TEXT_THRESHOLD = 150
     GRAY_THRESHOLD = 135
@@ -31,6 +35,8 @@ class Config:
     COL_EDGE_INTERVAL = intervals.open(-intervals.inf, -20000 // 920) | intervals.open(40000 // 920, intervals.inf)
     LINE_EDGE_INTERVAL = intervals.open(-intervals.inf, -200000 // 2160) | intervals.open(210000 // 2160,
                                                                                           400000 // 2160)
+    WORD_EDGE_INTERVAL = intervals.open(-intervals.inf, -0.5) | intervals.open(0.5, intervals.inf)
+    WORD_PROPORTION_INTERVAL = intervals.open(0.75, 1.2)
     LINE_EDGE_RANGE = intervals.open(0.1, 0.7)
 
     CELL_TEXT_REGION = ((396 / 442, 434 / 442), (20 / 203, None))
@@ -48,8 +54,8 @@ class Tesseract:
     _init_kwargs = None
 
     def __new__(cls, *args, **kwargs):
-        if cls._instance and (cls._init_kwargs is not None and cls._init_kwargs == kwargs)\
-                         and (cls._init_args is not None and cls._init_args == args):
+        if cls._instance and (cls._init_kwargs is not None and cls._init_kwargs == kwargs) \
+                and (cls._init_args is not None and cls._init_args == args):
             pass
         else:
             cls._init_args = args
@@ -78,32 +84,23 @@ class Tesseract:
                 tesseract_raw.lib_load_errors = []
                 break
             except OSError as ex:  # pragma: no cover
-                if hasattr(ex, 'message'):
-                    # python 2
-                    tesseract_raw.lib_load_errors.append((libname, ex.message))
-                else:
-                    # python 3
-                    tesseract_raw.lib_load_errors.append((libname, str(ex)))
-
+                tesseract_raw.lib_load_errors.append((libname, str(ex)))
         assert tesseract_raw.g_libtesseract
 
-        # Tesseract 4 workaround
-        if tesseract_raw.get_version() == "4.0.0":
-            locale.setlocale(locale.LC_ALL, "C")
-
+        locale.setlocale(locale.LC_ALL, "C")
         handle = tesseract_raw.g_libtesseract.TessBaseAPICreate()
+        print("API create")
         try:
             if language:
                 language = language.encode("utf-8")
             prefix = Config.TESSERACT_DATA_PATH.encode("utf-8")
-            # if tesseract_raw.TESSDATA_PREFIX:  # pragma: no cover
-            #     prefix = tesseract_raw.TESSDATA_PREFIX.encode("utf-8")
+
             tesseract_raw.g_libtesseract.TessBaseAPIInit1(
                 ctypes.c_void_p(handle),
                 ctypes.c_char_p(prefix),
                 ctypes.c_char_p(language),
                 ctypes.c_int(oem),
-                (ctypes.POINTER(ctypes.c_char_p) * len(configs))(*[ctypes.c_char_p(c) for c in configs]),
+                (ctypes.c_char_p * len(configs))(*[ctypes.c_char_p(c.encode()) for c in configs]),
                 ctypes.c_int(len(configs))
             )
             tesseract_raw.g_libtesseract.TessBaseAPISetVariable(
@@ -125,12 +122,11 @@ class Tesseract:
     def ocr(self, img, psm=7, digits=False):
         tesseract_raw.set_page_seg_mode(self.handle, psm)
         tesseract_raw.set_is_numeric(self.handle, digits)
+        img = PIL.fromarray(img.astype('uint8'))
         tesseract_raw.set_image(self.handle, img)
         text = tesseract_raw.get_utf8_text(self.handle)
         tesseract_raw.cleanup(self.handle)
         return text
-
-
 
 
 def debug(func):
@@ -175,8 +171,9 @@ class ImageBase:
     def __init__(self, img, *args, **kwargs):
         self.img = img
 
-    def slice(self, area=None, img=None):
+    def slice(self, area=None, img=None, area_rate=True):
         """
+        :param area_rate: if True, area should be in [0, 1]
         :param img: specify image to use. If None, use self.img
         :param area: percent of area.
         :return:
@@ -187,11 +184,12 @@ class ImageBase:
             area = ((None, None), (None, None))
         (a, b), (c, d) = area
         edges = [a, b, c, d]
-        multiple = [img.shape[0]] * 2 + [img.shape[1]] * 2
-        for index, e in enumerate(edges):
-            if e:
-                edges[index] = e * multiple[index]
-        edges = list(map(lambda x: round(x) if x else None, edges))
+        if area_rate:
+            multiple = [img.shape[0]] * 2 + [img.shape[1]] * 2
+            for index, e in enumerate(edges):
+                if e is not None:
+                    edges[index] = e * multiple[index]
+            edges = list(map(lambda x: round(x) if x is not None else None, edges))
         return img[edges[0]:edges[1], edges[2]:edges[3]]
 
     @debug
@@ -209,6 +207,10 @@ class ImageBase:
                 img = copied
         cv2.imshow(window_text, img)
         cv2.waitKey(0)
+        try:
+            del IMG_COPY_FOR_SHOW[id(self)]
+        except KeyError:
+            pass
         return self
 
     @debug
@@ -242,7 +244,8 @@ class ImageBase:
         print(f"{os.path.join(path, filename)} saved")
         return self
 
-    def find_edges(self, interval, axis=0, white_blank=True, blank_continues_threshold=0.3):
+    def find_edges(self, interval, axis=0, white_blank=True, blank_continues_threshold=0.3,
+                   lines_merge_blur=Config.LINES_MERGE_BLUR):
         """
         :param blank_continues_threshold:
         :param white_blank: blank area is colored white or black.
@@ -256,20 +259,29 @@ class ImageBase:
         for index, value in enumerate(axis_slope):
             if value / self.img.shape[axis] in interval:
                 # merge close lines as first one.
-                if edges and edges[-1][1] ^ value >= 0 and index - edges[-1][0] <= Config.LINES_MERGE_BLUR:
+                if edges and edges[-1][1] ^ value >= 0 and index - edges[-1][0] <= lines_merge_blur:
                     continue
                 # filter edge by continues blank length
                 if blank_continues_threshold:
-                    if value > 0 ^ white_blank:
+                    if (value < 0) ^ white_blank:
                         i = index
                     else:
                         i = index - 1
                     threshold = blank_continues_threshold * self.img.shape[axis]
-                    continues = count_continues(self.img.take([i], axis=1 - axis).flatten())
+                    continues = count_continues(self.img.take(i, axis=1 - axis).flatten())
                     if threshold > continues:
                         continue
                 edges.append((index, value))
         return edges
+
+    def add_rim(self, width=10, color=None):
+        if color is None:
+            if len(self.img.shape) == 3:
+                color = (0, 0, 0)
+            else:
+                color = 0
+        self.img = cv2.copyMakeBorder(self.img, *[width]*4, cv2.BORDER_CONSTANT, value=color)
+        return self
 
 
 class Box:
@@ -363,7 +375,7 @@ class BoxImage(ImageBase):
         """
         line_edges = [
             e for e in
-            self.find_edges(Config.LINE_EDGE_INTERVAL, 1, blank_continues_threshold=0.8)
+            self.find_edges(Config.LINE_EDGE_INTERVAL, 1, blank_continues_threshold=0.7)
             if e[0] / self.box.shape[0] in Config.LINE_EDGE_RANGE
         ]
         if len(line_edges) != 3:
@@ -418,7 +430,7 @@ class BoxImage(ImageBase):
             for x_start in self.grid_x_starts:
                 for y_start in self.box.grid_y_starts:
                     self._cells.append(Cell(self, self.img_raw[y_start:y_start + self.box.grid_height,
-                                                               x_start:x_start + self.box.grid_width]))
+                                                  x_start:x_start + self.box.grid_width]))
             # show(self.img_hsv_v_binary)
         return self._cells
 
@@ -449,8 +461,42 @@ class Cell(ImageBase):
                                    interpolation=cv2.INTER_LINEAR)
             text_area_v = cv2.cvtColor(text_area, cv2.COLOR_RGB2HSV)[:, :, 2]
             _, img_for_text_ocr = cv2.threshold(text_area_v, Config.HSV_V_TEXT_THRESHOLD, 255, cv2.THRESH_BINARY)
-
-            self._name = ocr(img_for_text_ocr, options='arknights', nice=1)
+            name = ocr(img_for_text_ocr, nice=1)
+            if name not in (ch["name"] for ch in loaded_data.character.values()):
+                print(f"ocr error: {name}")
+                # split single word and ocr again.
+                img_for_text_ocr = ImageBase(img_for_text_ocr)
+                y_edges = img_for_text_ocr.find_edges(Config.WORD_EDGE_INTERVAL, 1, False, 0.9, 1)
+                if len(y_edges) != 2:
+                    print(y_edges)
+                    y_edges = [y_edges[0], y_edges[-1]]
+                y_edges = [e[0] for e in y_edges]
+                for e in y_edges:
+                    img_for_text_ocr.mark_line(e, 1)
+                x_edges = img_for_text_ocr.find_edges(Config.WORD_EDGE_INTERVAL, 0, False, 0.9, 5)
+                x_edges_paired = []
+                start_flag = True
+                for i, e in enumerate(x_edges):
+                    if start_flag:
+                        x_edges_paired.append([e[0]])
+                        start_flag = False
+                    elif (e[0] - x_edges_paired[-1][0]) / (y_edges[1] - y_edges[0]) in Config.WORD_PROPORTION_INTERVAL:
+                        x_edges_paired[-1].append(e[0])
+                        start_flag = True
+                for es in x_edges_paired:
+                    for e in es:
+                        img_for_text_ocr.mark_line(e)
+                img_for_text_ocr.show()
+                if len(x_edges_paired[-1]) != 2:
+                    raise Exception(f"Error splitting words: \n{x_edges_paired}")
+                # for es in x_edges_paired:
+                #     print((es, y_edges))
+                #     ImageBase(img_for_text_ocr.slice((y_edges, es), area_rate=False)).show()
+                words = [img_for_text_ocr.slice((y_edges, es), area_rate=False) for es in x_edges_paired]
+                words = [ImageBase(w).add_rim() for w in words]
+                map(ImageBase.show, words)
+                name = "".join((ocr(w, psm=10, nice=1) for w in words))
+            self._name = name
         return self._name
 
     @property
@@ -468,9 +514,9 @@ class Cell(ImageBase):
                 2: 0
             }
             phase_img = self.slice(Config.CELL_PHASE_REGION)
-            col_half_index = phase_img.shape[1]//2
-            col_2_change = sum(abs(x) for x in slope(phase_img[:, 1]))//255
-            col_half_change = sum(abs(x) for x in slope(phase_img[:, col_half_index]))//255
+            col_half_index = phase_img.shape[1] // 2
+            col_2_change = sum(abs(x) for x in slope(phase_img[:, 1])) // 255
+            col_half_change = sum(abs(x) for x in slope(phase_img[:, col_half_index])) // 255
             col_half_continues_rate = count_continues(phase_img[:, col_half_index]) / phase_img.shape[0]
 
             if col_2_change <= 1:
@@ -488,7 +534,7 @@ class Cell(ImageBase):
                 weight[0] += 1
 
             if col_half_continues_rate > 0.5:
-                if phase_img[phase_img.shape[0]*2//5, col_half_index] > 128:
+                if phase_img[phase_img.shape[0] * 2 // 5, col_half_index] > 128:
                     weight[0] += 1
                 else:
                     weight[1] += 1
@@ -554,10 +600,19 @@ def find_most_confident(
     return final_results
 
 
+def alike(word, pattern):
+    correct = 0
+    for i, ch in enumerate(word):
+        try:
+            if pattern[i] == ch:
+                correct += 1
+        except IndexError:
+            break
+    return correct / min(len(word), len(pattern))
+
+
 if __name__ == '__main__':
     my_box = Box("../box_images/test")
-    for i in my_box.images:
-        for c in i.cells:
+    for im in my_box.images:
+        for c in im.cells:
             print(c.name, c.phase, c.level)
-
-

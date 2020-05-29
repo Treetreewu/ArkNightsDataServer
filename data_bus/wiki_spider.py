@@ -10,7 +10,7 @@ COLS = ['image', 'name', 'organization', 'profession', 'stars', 'gender', 'infec
         'attack_resistance', 'magic_resistance', 'redeployment', 'cost', 'perfect_cost', 'block', 'attack_speed',
         'comment', 'raw_tags']
 
-# ------------------------Deprecated--------------------------
+# ------------------------Deprecated, see data_bus.data_loader--------------------------
 
 class DoMan:
     """
