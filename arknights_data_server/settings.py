@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'arknights_data_server',
+    "rest_framework"
 ]
 
 MIDDLEWARE = [
