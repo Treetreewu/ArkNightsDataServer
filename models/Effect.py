@@ -1,8 +1,7 @@
 import django.db.models as models
 import enum
 from data_bus.data_loader import loaded_data
-
-TypeSimple = enum.Enum("TypeSimple", ("V", "V1"))
+from models.Skill import Skill
 
 
 class Type(enum.Enum):
@@ -11,7 +10,7 @@ class Type(enum.Enum):
     VALUE_BLOCK = 3
     SILENCE = 4
     STUN = 5
-    REPULSE = 6
+    DISPLACEMENT = 6
 
 
 class ValueTarget(enum.Enum):
@@ -27,22 +26,23 @@ class ValueTarget(enum.Enum):
     SP_RECOVER_PS = 10
 
 
-class Target(enum.Enum):
-    SELF = 1
-    ALLY = 2
-    ENEMY = 3
+class TargetFilter(enum.Enum):
+    SELF = 100
+    ALLY = 200
+    ENEMY = 300
+    ALLY_
 
 
 class Effect(models.Model):
     type = models.IntegerField(choices=[(t.value, t.name) for t in Type])
     value_target = models.IntegerField(choices=[(t.value, t.name) for t in ValueTarget], default=0)
     value = models.DecimalField(max_digits=10, decimal_places=4, help_text="", default=0)
-    target = models.SmallIntegerField(choices=[(t.value, t.name) for t in Target])
-    count = models.IntegerField(help_text="作用的目标个数, -1=all_in_range", default=1)
+    target_filter = models.IntegerField(choices=[(t.value, t.name) for t in TargetFilter])
+    count = models.IntegerField(help_text="最大作用的目标个数, -1=unlimited", default=1)
     duration = models.DecimalField(max_digits=10, decimal_places=4, help_text="0=瞬间效果，-1=持续时间无限", default=0)
     range = models.CharField()
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE)
 
 
 if __name__ == '__main__':
     pass
-
